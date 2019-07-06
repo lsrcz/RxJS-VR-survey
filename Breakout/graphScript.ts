@@ -125,39 +125,15 @@ function syncWithTick < T > (v: Observable < T > ): Observable < T > {
     );
 }
 
-function syncedInput < T1, T2, T3, T4, T5, T6 > (
-    v1: Observable < T1 > ,
-    v2 ? : Observable < T2 > ,
-    v3 ? : Observable < T3 > ,
-    v4 ? : Observable < T4 > ,
-    v5 ? : Observable < T5 > ,
-    v6 ? : Observable < T6 > ): Observable < (T1 | T2 | T3 | T4 | T5 | T6)[] > {
-    if (typeof v2 == 'undefined') {
-        return zip(tick$, v1).pipe(
-            map(([_, v1]) => [v1]),
-            share()
-        );
-    } else if (typeof v3 == 'undefined') {
-        return zip(tick$, v1, v2).pipe(
-            map(([_, v1, v2]) => [v1, v2])
-        );
-    } else if (typeof v4 == 'undefined') {
-        return zip(tick$, v1, v2, v3).pipe(
-            map(([_, v1, v2, v3]) => [v1, v2, v3])
-        );
-    } else if (typeof v5 == 'undefined') {
-        return zip(tick$, v1, v2, v3, v4).pipe(
-            map(([_, v1, v2, v3, v4]) => [v1, v2, v3, v4])
-        );
-    } else if (typeof v6 == 'undefined') {
-        return zip(tick$, v1, v2, v3, v4, v5).pipe(
-            map(([_, v1, v2, v3, v4, v5]) => [v1, v2, v3, v4, v5])
-        );
-    } else {
-        return zip(tick$, v1, v2, v3, v4, v5, v6).pipe(
-            map(([_, v1, v2, v3, v4, v5, v6]) => [v1, v2, v3, v4, v5, v6])
-        );
-    }
+function syncedInput(...args: (Observable<any>|Subject<any>)[]): Observable<any[]> {
+    return zip(tick$, ...(args.map(o => {
+        if (o instanceof Subject) {
+            return o.asObservable();
+        }
+        return o;
+    }))).pipe(
+        map(([x, ...args]) => args)
+    );
 }
 
 // RELAY
@@ -259,63 +235,63 @@ function calculateNewDir(collisionX: boolean, collisionY: boolean, ballDir: Ball
 
 // STREAMS
 
-const collisionPaddle$$ = syncedInput(paddlePos$.asObservable(), ball$.asObservable()).pipe(
+const collisionPaddle$$ = syncedInput(paddlePos$, ball$).pipe(
     map(([paddle, ball]) => isCollidedPaddle( < number > paddle, < Ball > ball)),
     tap(e => collisionPaddle$.next(e))
 );
 
-const collisionBrick$$ = syncedInput(bricks$.asObservable(), ball$.asObservable()).pipe(
+const collisionBrick$$ = syncedInput(bricks$, ball$).pipe(
     map(([bricks, ball]) => isCollidedBrick( < Brick[] > bricks, < Ball > (ball))),
     tap(e => collisionBrick$.next(e))
 );
 
-const collisionWall$$ = syncedInput(ball$.asObservable()).pipe(
+const collisionWall$$ = syncedInput(ball$).pipe(
     map(([ball]) => isCollidedWall( < Ball > (ball))),
     tap(e => collisionWall$.next(e))
 );
 
-const collisionGround$$ = syncedInput(paddlePos$.asObservable(), ball$.asObservable()).pipe(
+const collisionGround$$ = syncedInput(paddlePos$, ball$).pipe(
     map(([paddle, ball]) => isCollidedGround( < number > paddle, < Ball > (ball))),
     tap(e => collisionGround$.next(e))
 );
 
-const collisionCeiling$$ = syncedInput(ball$.asObservable()).pipe(
+const collisionCeiling$$ = syncedInput(ball$).pipe(
     map(([ball]) => isCollidedCeiling( < Ball > (ball))),
     tap(e => collisionCeiling$.next(e))
 );
 
-const ball$$ = syncedInput(ballDir$.asObservable(), ball$.asObservable(), collisionWall$.asObservable(), collisionY$.asObservable()).pipe(
+const ball$$ = syncedInput(ballDir$, ball$, collisionWall$, collisionY$).pipe(
     map(([ballDir, ball, cX, cY]) => calculateBallPos( < BallDir > ballDir, < Ball > ball, < boolean > cX, < boolean > cY)),
     tap(e => ball$.next(e))
 );
 
-const score$$ = syncedInput(collisionBrick$.asObservable(), score$.asObservable()).pipe(
+const score$$ = syncedInput(collisionBrick$, score$).pipe(
     map(([brick, score]) => calculateNewScore( < number > brick, < number > score)),
     tap(e => score$.next(e))
 );
 
-const brick$$ = syncedInput(bricks$.asObservable(), collisionBrick$.asObservable()).pipe(
+const brick$$ = syncedInput(bricks$, collisionBrick$).pipe(
     map(([bricks, collision]) => calculateNewBrickSet( < Brick[] > (bricks), < number > (collision))),
     tap(e => bricks$.next(e))
 );
 
-const paddlePos$$ = syncedInput(paddleDirRelay$, paddlePos$.asObservable()).pipe(
+const paddlePos$$ = syncedInput(paddleDirRelay$, paddlePos$).pipe(
     map(([paddleDir, paddlePos]) => calculateNewPaddlePos( < number > paddleDir, < number > paddlePos)),
     tap(e => paddlePos$.next(e))
 );
 
-const collisionY$$ = syncedInput(collisionBrick$.asObservable(), collisionCeiling$.asObservable(), collisionPaddle$.asObservable()).pipe(
+const collisionY$$ = syncedInput(collisionBrick$, collisionCeiling$, collisionPaddle$).pipe(
     map(([cB, cC, cP]) => [cB != -1, cC, cP]),
     map(([cB, cC, cP]) => cB || cC || cP),
     tap((e: boolean) => collisionY$.next(e))
 );
 
-const ballDir$$ = syncedInput(collisionWall$.asObservable(), collisionY$.asObservable(), ballDir$.asObservable()).pipe(
+const ballDir$$ = syncedInput(collisionWall$, collisionY$, ballDir$).pipe(
     map(([cX, cY, d]) => calculateNewDir( < boolean > cX, < boolean > cY, < BallDir > d)),
     tap(e => ballDir$.next(e))
 );
 
-const shouldShutdown$$ = syncedInput(bricks$.asObservable(), collisionGround$.asObservable()).pipe(
+const shouldShutdown$$ = syncedInput(bricks$, collisionGround$).pipe(
     map(([b, cg]) => ( < Brick[] > b).length == 0 || < boolean > cg),
     tap(e => shouldShutdown$.next(e))
 );
@@ -425,7 +401,7 @@ function drawAll(paddlePos: number, bricks: Brick[], ball: Ball, score: number, 
 }
 
 // OBSERVER
-syncedInput(paddlePos$.asObservable(), bricks$.asObservable(), ball$.asObservable(), score$.asObservable(), shouldShutdown$.asObservable(), collisionGround$.asObservable()).pipe(
+syncedInput(paddlePos$, bricks$, ball$, score$, shouldShutdown$, collisionGround$).pipe(
     tap(([paddlePos, bricks, ball, score, shut, cg]) => drawAll( < number > paddlePos, < Brick[] > bricks, < Ball > ball, < number > score, < boolean > shut, < boolean > cg))
 ).subscribe();
 

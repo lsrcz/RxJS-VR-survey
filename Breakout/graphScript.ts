@@ -82,18 +82,9 @@ function factory() {
 }
 
 // ASYNC
-const paddleDir$: Observable < number > = merge(
+const keyCodeAsync$: Observable < number > = merge(
     fromEvent(document, 'keydown').pipe(
-        map((e: KeyboardEvent) => {
-            switch (e.keyCode) {
-                case PADDLE_KEYS.left:
-                    return -1;
-                case PADDLE_KEYS.right:
-                    return 1;
-                default:
-                    return 0;
-            }
-        })),
+        map((e: KeyboardEvent) => e.keyCode)),
     fromEvent(document, 'keyup').pipe(
         map((e: KeyboardEvent) => 0)
     )
@@ -102,7 +93,7 @@ const paddleDir$: Observable < number > = merge(
     share()
 );
 
-paddleDir$.pipe(
+keyCodeAsync$.pipe(
     take(1),
     tap(_ => control$.next(true))
 ).subscribe()
@@ -137,7 +128,7 @@ function syncedInput(...args: (Observable<any>|Subject<any>)[]): Observable<any[
 }
 
 // RELAY
-const paddleDirRelay$ = syncWithTick(paddleDir$);
+const keyCodeRelay$ = syncWithTick(keyCodeAsync$);
 
 // SUBJECTS
 const paddlePos$: BehaviorSubject < number > = new BehaviorSubject < number > (canvas.width / 2);
@@ -153,6 +144,7 @@ const ball$: BehaviorSubject < Ball > = new BehaviorSubject < Ball > ({
 const score$: BehaviorSubject < number > = new BehaviorSubject < number > (0);
 const shouldShutdown$: BehaviorSubject < boolean > = new BehaviorSubject < boolean > (false);
 
+const paddleDir$: Subject < number > = new Subject < number > ();
 const collisionBrick$: Subject < number > = new Subject < number > ();
 const collisionWall$: Subject < boolean > = new Subject < boolean > ();
 const collisionPaddle$: Subject < boolean > = new Subject < boolean > ();
@@ -275,7 +267,19 @@ const brick$$ = syncedInput(bricks$, collisionBrick$).pipe(
     tap(e => bricks$.next(e))
 );
 
-const paddlePos$$ = syncedInput(paddleDirRelay$, paddlePos$).pipe(
+const paddleDir$$ = syncedInput(keyCodeRelay$).pipe(
+    map(([keyCode]) => {
+        if (keyCode == PADDLE_KEYS.left) {
+            return -1;
+        } else if (keyCode == PADDLE_KEYS.right) {
+            return 1;
+        }
+        return 0;
+    }),
+    tap(e => paddleDir$.next(e))
+)
+
+const paddlePos$$ = syncedInput(paddleDir$, paddlePos$).pipe(
     map(([paddleDir, paddlePos]) => calculateNewPaddlePos( < number > paddleDir, < number > paddlePos)),
     tap(e => paddlePos$.next(e))
 );
@@ -309,7 +313,8 @@ merge(
     paddlePos$$,
     collisionY$$,
     ballDir$$,
-    shouldShutdown$$
+    shouldShutdown$$,
+    paddleDir$$
 ).subscribe()
 
 

@@ -105,7 +105,7 @@ const control$: BehaviorSubject < boolean > = new BehaviorSubject(false);
 const tick$ = control$.asObservable().pipe(
     distinctUntilChanged(),
     switchMap(isTicking => {
-        return isTicking ? interval(TICKER_INTERVAL, animationFrameScheduler) : NEVER;
+        return isTicking ? /*interval(TICKER_INTERVAL, animationFrameScheduler)*/ interval(TICKER_INTERVAL / 5) : NEVER;
     })
 );
 
@@ -191,8 +191,8 @@ function isCollidedCeiling(ball: Ball): boolean {
 }
 
 function calculateBallPos(ballDir: BallDir, ball: Ball, collisionX: boolean, collisionY: boolean): Ball {
-    ball.x += ballDir.x * (collisionX ? -1 : 1);
-    ball.y += ballDir.y * (collisionY ? -1 : 1);
+    ball.x += ballDir.x * (collisionX ? -1 : 1) * 0.2;
+    ball.y += ballDir.y * (collisionY ? -1 : 1) * 0.2;
     return ball;
 }
 
@@ -212,7 +212,7 @@ function calculateNewBrickSet(bricks: Brick[], collision: number): Brick[] {
 }
 
 function calculateNewPaddlePos(paddleDir: number, paddlePos: number) {
-    return paddlePos + paddleDir * 10;
+    return paddlePos + paddleDir * 2;
 }
 
 function calculateNewDir(collisionX: boolean, collisionY: boolean, ballDir: BallDir): BallDir {
@@ -405,8 +405,18 @@ function drawAll(paddlePos: number, bricks: Brick[], ball: Ball, score: number, 
     }
 }
 
-// OBSERVER
-syncedInput(paddlePos$, bricks$, ball$, score$, shouldShutdown$, collisionGround$).pipe(
+// DRAW
+
+const screenTick$ = control$.asObservable().pipe(
+    distinctUntilChanged(),
+    switchMap(isTicking => {
+        return isTicking ? interval(TICKER_INTERVAL, animationFrameScheduler) : NEVER;
+    })
+);
+
+screenTick$.pipe(
+    withLatestFrom(syncedInput(paddlePos$, bricks$, ball$, score$, shouldShutdown$, collisionGround$)),
+    map(([_, t]) => t),
     tap(([paddlePos, bricks, ball, score, shut, cg]) => drawAll( < number > paddlePos, < Brick[] > bricks, < Ball > ball, < number > score, < boolean > shut, < boolean > cg))
 ).subscribe();
 

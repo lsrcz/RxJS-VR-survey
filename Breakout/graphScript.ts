@@ -113,18 +113,49 @@ const tick$ = control$.asObservable().pipe(
 function syncWithTick < T > (v: Observable < T > ): Observable < T > {
     return tick$.pipe(
         withLatestFrom(v),
-        map(([_, v]) => v)
+        map(([_, v]) => v),
+        share()
     );
 }
 
-function syncedInput(...args: (Observable<any>|Subject<any>)[]): Observable<any[]> {
+function syncedInput(...args: (Observable < any > | Subject < any > )[]): Observable < any[] > {
     return zip(tick$, ...(args.map(o => {
         if (o instanceof Subject) {
             return o.asObservable();
         }
         return o;
     }))).pipe(
-        map(([x, ...args]) => args)
+        map(([x, ...args]) => args),
+        share()
+    );
+}
+
+function splitStream(stream: Observable < any[] > , num: number): Observable < any > [] {
+    var ret: Subject < any > [] = [];
+    for (var i = 0; i < num; ++i) {
+        ret.push(new Subject());
+    }
+    stream.pipe(
+        tap(arr => {
+            for (var i = 0; i < num; ++i) {
+                ret[i].next(arr[i]);
+            }
+        })
+    ).subscribe();
+    return ret.map(e => e.asObservable());
+}
+
+function syncedStreams(...args: (Observable < any > | Subject < any > )[]): Observable < any > [] {
+    return splitStream(syncedInput(...args), args.length);
+}
+
+function link(f: (inputs: Observable < any > []) => Observable < any > ,
+    outSubject: Subject < any > ,
+    ...args: (Observable < any > | Subject < any > )[]) {
+    return f(
+        syncedStreams(...args)
+    ).pipe(
+        tap(e => outSubject.next(e))
     );
 }
 
@@ -154,7 +185,10 @@ const collisionCeiling$: Subject < boolean > = new Subject < boolean > ();
 
 const collisionY$: Subject < boolean > = new Subject < boolean > ();
 
-// FUNCTIONS
+// NEXT SUBJECTS -- for "next" dependencies
+const nextBallDir$ = ballDir$.asObservable().pipe(skip(1));
+
+// USER FUNCTIONS
 
 function isCollidedPaddle(paddlePos: number, ball: Ball): boolean {
     return ball.x > paddlePos - PADDLE_WIDTH / 2 &&
@@ -232,7 +266,7 @@ function calculateNewDir(collisionX: boolean, collisionY: boolean, ballDir: Ball
     return ballDir;
 }
 
-// STREAMS
+// STREAMS -- OLD STYLE
 
 const collisionPaddle$$ = syncedInput(paddlePos$, ball$).pipe(
     map(([paddle, ball]) => isCollidedPaddle( < number > paddle, < Ball > ball)),
@@ -259,15 +293,7 @@ const collisionCeiling$$ = syncedInput(ball$).pipe(
     tap(e => collisionCeiling$.next(e))
 );
 
-const nextDir$ = ballDir$.asObservable().pipe(skip(1));
-
-/*
-const ball$$ = syncedInput(ballDir$, ball$, collisionWall$, collisionY$).pipe(
-    map(([ballDir, ball, cX, cY]) => calculateBallPos( < BallDir > ballDir, < Ball > ball, < boolean > cX, < boolean > cY)),
-    tap(e => ball$.next(e))
-);*/
-
-const ball$$ = syncedInput(nextDir$, ball$).pipe(
+const ball$$ = syncedInput(nextBallDir$, ball$).pipe(
     map(([nextDir, ball]) => calculateBallPosNext(nextDir, ball)),
     tap(e => ball$.next(e))
 );
@@ -315,21 +341,158 @@ const shouldShutdown$$ = syncedInput(bricks$, collisionGround$).pipe(
     tap(e => shouldShutdown$.next(e))
 );
 
+
+// FUNCTIONS TO SYNTHESIZE
+
+function collisionPaddleFunc(inputs: Observable < any > []): Observable < any > {
+    var r1 = inputs[0]; // paddlePos$
+    var r2 = inputs[1]; // ball$
+    var r3 = zip(r1, r2);
+    var r4 = r3.pipe(
+        map(([paddle, ball]) => isCollidedPaddle( < number > paddle, < Ball > ball))
+    );
+    return r4;
+}
+
+function collisionBrickFunc(inputs: Observable < any > []): Observable < any > {
+    var r1 = inputs[0]; // bricks$
+    var r2 = inputs[1]; // ball$
+    var r3 = zip(r1, r2);
+    var r4 = r3.pipe(
+        map(([bricks, ball]) => isCollidedBrick( < Brick[] > bricks, < Ball > (ball)))
+    )
+    return r4;
+}
+
+function collisionWallFunc(inputs: Observable < any > []): Observable < any > {
+    var r1 = inputs[0]; // ball$
+    var r2 = r1.pipe(
+        map(ball => isCollidedWall(ball))
+    );
+    return r2;
+}
+
+function collisionGroundFunc(inputs: Observable < any > []): Observable < any > {
+    var r1 = inputs[0]; // paddlePos$ 
+    var r2 = inputs[1]; // ball$
+    var r3 = zip(r1, r2);
+    var r4 = r3.pipe(
+        map(([paddle, ball]) => isCollidedGround( < number > paddle, < Ball > (ball)))
+    );
+    return r4;
+}
+
+function collisionCeilingFunc(inputs: Observable < any > []): Observable < any > {
+    var r1 = inputs[0]; // ball$
+    var r2 = r1.pipe(
+        map(ball => isCollidedCeiling(ball)),
+    );
+    return r2;
+}
+
+function ballFunc(inputs: Observable < any > []): Observable < any > {
+    var r1 = inputs[0]; // nextBallDir$
+    var r2 = inputs[1]; // ball$
+    var r3 = zip(r1, r2);
+    var r4 = r3.pipe(
+        map(([nextDir, ball]) => calculateBallPosNext(nextDir, ball))
+    );
+    return r4;
+}
+
+function scoreFunc(inputs: Observable < any > []): Observable < any > {
+    var r1 = inputs[0]; // bricks$
+    var r2 = inputs[1]; // score$
+    var r3 = zip(r1, r2);
+    var r4 = r3.pipe(
+        map(([brick, score]) => calculateNewScore( < number > brick, < number > score))
+    );
+    return r4;
+}
+
+function bricksFunc(inputs: Observable < any > []): Observable < any > {
+    var r1 = inputs[0]; // bricks$
+    var r2 = inputs[1]; // collision$
+    var r3 = zip(r1, r2);
+    var r4 = r3.pipe(
+        map(([bricks, collision]) => calculateNewBrickSet( < Brick[] > (bricks), < number > (collision)))
+    );
+    return r4;
+}
+
+function paddleDirFunc(inputs: Observable < any > []): Observable < any > {
+    var r1 = inputs[0]; // keyCodeRelay$
+    var r2 = r1.pipe(
+        map(keyCode => {
+            if (keyCode == PADDLE_KEYS.left) {
+                return -1;
+            } else if (keyCode == PADDLE_KEYS.right) {
+                return 1;
+            }
+            return 0;
+        })
+    );
+    return r2;
+}
+
+function paddlePosFunc(inputs: Observable < any > []): Observable < any > {
+    var r1 = inputs[0]; // paddleDir$
+    var r2 = inputs[1]; // paddlePos$
+    var r3 = zip(r1, r2);
+    var r4 = r3.pipe(
+        map(([paddleDir, paddlePos]) => calculateNewPaddlePos( < number > paddleDir, < number > paddlePos))
+    );
+    return r4;
+}
+
+function collisionYFunc(inputs: Observable < any > []): Observable < any > {
+    var r1 = inputs[0]; // collisionBrick$
+    var r2 = inputs[1]; // collisionCeiling$
+    var r3 = inputs[2]; // collisionPaddle$
+    var r4 = r1.pipe(map(e => e != -1));
+    var r5 = zip(r4, r2, r3);
+    var r6 = r5.pipe(
+        map(([cB, cC, cP]) => cB || cC || cP)
+    );
+    return r6;
+}
+
+function ballDirFunc(inputs: Observable < any > []): Observable < any > {
+    var r1 = inputs[0]; // collisionWall$
+    var r2 = inputs[1]; // collisionY$
+    var r3 = inputs[2]; // ballDir$
+    var r4 = zip(r1, r2, r3);
+    var r5 = r4.pipe(
+        map(([cX, cY, d]) => calculateNewDir( < boolean > cX, < boolean > cY, < BallDir > d))
+    );
+    return r5;
+}
+
+function shouldShutdownFunc(inputs: Observable < any > []): Observable < any > {
+    var r1 = inputs[0]; // bricks$
+    var r2 = inputs[1]; // collisionGround$
+    var r3 = zip(r1, r2);
+    var r4 = r3.pipe(
+        map(([b, cg]) => ( < Brick[] > b).length == 0 || < boolean > cg)
+    );
+    return r4;
+}
+
 // DRIVER
 merge(
-    collisionPaddle$$,
-    collisionBrick$$,
-    collisionWall$$,
-    collisionGround$$,
-    collisionCeiling$$,
-    ball$$,
-    score$$,
-    brick$$,
-    paddlePos$$,
-    collisionY$$,
-    ballDir$$,
-    shouldShutdown$$,
-    paddleDir$$
+    link(collisionPaddleFunc, collisionPaddle$, paddlePos$, ball$),
+    link(collisionBrickFunc, collisionBrick$, bricks$, ball$),
+    link(collisionWallFunc, collisionWall$, ball$),
+    link(collisionGroundFunc, collisionGround$, paddlePos$, ball$),
+    link(collisionCeilingFunc, collisionCeiling$, ball$),
+    link(ballFunc, ball$, nextBallDir$, ball$),
+    link(scoreFunc, score$, collisionBrick$, score$),
+    link(bricksFunc, bricks$, bricks$, collisionBrick$),
+    link(paddleDirFunc, paddleDir$, keyCodeRelay$),
+    link(paddlePosFunc, paddlePos$, paddleDir$, paddlePos$),
+    link(collisionYFunc, collisionY$, collisionBrick$, collisionCeiling$, collisionPaddle$),
+    link(ballDirFunc, ballDir$, collisionWall$, collisionY$, ballDir$),
+    link(shouldShutdownFunc, shouldShutdown$, bricks$, collisionGround$)
 ).subscribe()
 
 

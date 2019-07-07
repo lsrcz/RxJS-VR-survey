@@ -19,7 +19,8 @@ import {
     tap,
     share,
     switchMap,
-    take
+    take,
+    skip
 } from "rxjs/operators";
 
 // CONTANTS
@@ -196,6 +197,12 @@ function calculateBallPos(ballDir: BallDir, ball: Ball, collisionX: boolean, col
     return ball;
 }
 
+function calculateBallPosNext(nextBallDir: BallDir, ball: Ball): Ball {
+    ball.x += nextBallDir.x * 0.2;
+    ball.y += nextBallDir.y * 0.2;
+    return ball;
+}
+
 function calculateNewScore(brick: number, score: number): number {
     if (brick == -1) {
         return score;
@@ -252,8 +259,16 @@ const collisionCeiling$$ = syncedInput(ball$).pipe(
     tap(e => collisionCeiling$.next(e))
 );
 
+const nextDir$ = ballDir$.asObservable().pipe(skip(1));
+
+/*
 const ball$$ = syncedInput(ballDir$, ball$, collisionWall$, collisionY$).pipe(
     map(([ballDir, ball, cX, cY]) => calculateBallPos( < BallDir > ballDir, < Ball > ball, < boolean > cX, < boolean > cY)),
+    tap(e => ball$.next(e))
+);*/
+
+const ball$$ = syncedInput(nextDir$, ball$).pipe(
+    map(([nextDir, ball]) => calculateBallPosNext(nextDir, ball)),
     tap(e => ball$.next(e))
 );
 

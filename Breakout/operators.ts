@@ -62,7 +62,7 @@ export function sub(lhs: Observable < number > , rhs: Observable < number > ): O
     );
 }
 
-export function times(lhs: Observable < number > , rhs: Observable < number > ): Observable < number > {
+export function mul(lhs: Observable < number > , rhs: Observable < number > ): Observable < number > {
     return zip(lhs, rhs).pipe(
         map(([l, r]) => l * r)
     );

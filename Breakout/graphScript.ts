@@ -24,7 +24,7 @@ import {
     getField,
     constant,
     lessThan,
-    times,
+    mul as mul,
     add,
     map2,
     map1,
@@ -259,8 +259,8 @@ function ballFunc(inputs: Observable < any > []): Observable < any > {
     var r4 = getField(inputs[1], "y"); // ball.y
 
     var r5 = constant(0.2);
-    var r6 = times(r1, r5);
-    var r7 = times(r2, r5);
+    var r6 = mul(r1, r5);
+    var r7 = mul(r2, r5);
     var r8 = add(r3, r6);
     var r9 = add(r4, r7);
 

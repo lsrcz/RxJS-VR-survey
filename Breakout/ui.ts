@@ -1,7 +1,7 @@
 import { BRICK_GAP, PADDLE_WIDTH, PADDLE_HEIGHT, BALL_RADIUS } from "./constants";
 
 import { stopTick } from "./tick";
-import { Ball, Brick } from "./model";
+import { Ball, Brick } from "./interface";
 
 export const canvas = < HTMLCanvasElement > document.getElementById('stage');
 const context = canvas.getContext('2d');

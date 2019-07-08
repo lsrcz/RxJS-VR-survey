@@ -1,14 +1,14 @@
-export class Ball {
+export interface Ball {
     x: number;
     y: number;
 };
 
-export class BallDir {
+export interface BallDir {
     x: number;
     y: number;
 }
 
-export class Brick {
+export interface Brick {
     x: number;
     y: number;
     width: number;

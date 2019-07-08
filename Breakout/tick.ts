@@ -2,7 +2,7 @@ import { BehaviorSubject, interval, NEVER, Observable, Subject, zip, animationFr
 import { distinctUntilChanged, switchMap, withLatestFrom, map, share, tap } from "rxjs/operators";
 
 var frameTickerInterval = 17;
-var driverTickerInterval = frameTickerInterval / 5;
+var driverTickerInterval = frameTickerInterval / 2;
 
 const control$: BehaviorSubject < boolean > = new BehaviorSubject(false);
 
@@ -73,7 +73,7 @@ export function link(f: (inputs: Observable < any > []) => Observable < any > ,
 
 export function setTickInterval(t: number): void {
     frameTickerInterval = t;
-    driverTickerInterval = t / 5;
+    driverTickerInterval = t / 2;
 }
 
 export function startTick(): void {

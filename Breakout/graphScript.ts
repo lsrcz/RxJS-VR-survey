@@ -50,7 +50,7 @@ import {
     BallDir,
     Brick,
     Ball
-} from "./model";
+} from "./interface";
 import {
     drawAll,
     drawTitle,
@@ -160,14 +160,14 @@ function isCollidedCeiling(ball: Ball): boolean {
 }
 
 function calculateBallPos(ballDir: BallDir, ball: Ball, collisionX: boolean, collisionY: boolean): Ball {
-    ball.x += ballDir.x * (collisionX ? -1 : 1) * 0.2;
-    ball.y += ballDir.y * (collisionY ? -1 : 1) * 0.2;
+    ball.x += ballDir.x * (collisionX ? -1 : 1) * 0.5;
+    ball.y += ballDir.y * (collisionY ? -1 : 1) * 0.5;
     return ball;
 }
 
 function calculateBallPosNext(nextBallDir: BallDir, ball: Ball): Ball {
-    ball.x += nextBallDir.x * 0.2;
-    ball.y += nextBallDir.y * 0.2;
+    ball.x += nextBallDir.x * 0.5;
+    ball.y += nextBallDir.y * 0.5;
     return ball;
 }
 
@@ -187,7 +187,7 @@ function calculateNewBrickSet(bricks: Brick[], collision: number): Brick[] {
 }
 
 function calculateNewPaddlePos(paddleDir: number, paddlePos: number) {
-    return paddlePos + paddleDir * 2;
+    return paddlePos + paddleDir * 4;
 }
 
 function calculateNewDir(collisionX: boolean, collisionY: boolean, ballDir: BallDir): BallDir {
@@ -309,7 +309,7 @@ function ballFunc(inputs: Observable < any > []): Observable < any > {
     var r3 = getField(inputs[1], "x"); // ball.x
     var r4 = getField(inputs[1], "y"); // ball.y
 
-    var r5 = constant(0.2);
+    var r5 = constant(0.5);
     var r6 = mul(r1, r5);
     var r7 = mul(r2, r5);
     var r8 = add(r3, r6);
@@ -327,8 +327,8 @@ function ballFunc(inputs: Observable < any > []): Observable < any > {
     var r2 = inputs[1]; // ball$ 
     var r3 = getField(r1, "x");
     var r4 = getField(r1, "y");
-    var r5 = map1(r3, e => e * 0.2);
-    var r6 = map1(r4, e => e * 0.2);
+    var r5 = map1(r3, e => e * 0.5);
+    var r6 = map1(r4, e => e * 0.5);
     var r7 = getField(r2, "x");
     var r8 = getField(r2, "y");
     var r9 = add(r5, r7);
@@ -417,7 +417,7 @@ function paddleDirFunc(inputs: Observable < any > []): Observable < any > {
 function paddlePosFunc(inputs: Observable < any > []): Observable < any > {
     var r1 = inputs[0]; // paddleDir$
     var r2 = inputs[1]; // paddlePos$ 
-    var r3 = constant(2);
+    var r3 = constant(4);
     var r4 = mul(r1, r3);
     var r5 = add(r2, r4);
     return r5;

@@ -22,6 +22,12 @@ export function equalTo(lhs: Observable < number > , rhs: Observable < number > 
     );
 }
 
+export function lessThanOrEqualTo(lhs: Observable < number > , rhs: Observable < number > ): Observable < boolean > {
+    return zip(lhs, rhs).pipe(
+        map(([l, r]) => l <= r)
+    );
+}
+
 export function and(lhs: Observable < boolean > , rhs: Observable < boolean > ): Observable < boolean > {
     return zip(lhs, rhs).pipe(
         map(([l, r]) => l && r)

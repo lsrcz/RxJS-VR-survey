@@ -29,7 +29,12 @@ import {
     map2,
     map1,
     ifOp,
-    equalTo
+    equalTo,
+    not,
+    or,
+    sub,
+    and,
+    lessThanOrEqualTo
 } from "./operators";
 import {
     BRICK_GAP,
@@ -199,12 +204,29 @@ function calculateNewDir(collisionX: boolean, collisionY: boolean, ballDir: Ball
 
 function collisionPaddleFunc(inputs: Observable < any > []): Observable < any > {
     var r1 = inputs[0]; // paddlePos$
+    var r2 = getField(inputs[1], "x"); // ball$.x
+    var r3 = getField(inputs[1], "y"); // ball$.y
+    var r4 = constant(PADDLE_WIDTH / 2);
+    var r5 = constant(canvas.height - PADDLE_HEIGHT);
+    var r6 = constant(BALL_RADIUS / 2);
+    var r7 = sub(r1, r4);
+    var r8 = lessThan(r7, r2);
+    var r9 = add(r1, r4);
+    var r10 = lessThan(r2, r9);
+    var r11 = sub(r5, r6);
+    var r12 = lessThan(r11, r3);
+    var r13 = and(r8, r10);
+    var r14 = and(r12, r13);
+    return r14;
+    /*
+    var r1 = inputs[0]; // paddlePos$
     var r2 = inputs[1]; // ball$
     var r3 = zip(r1, r2);
     var r4 = r3.pipe(
         map(([paddle, ball]) => isCollidedPaddle( < number > paddle, < Ball > ball))
     );
     return r4;
+    */
 }
 
 function collisionBrickFunc(inputs: Observable < any > []): Observable < any > {
@@ -218,14 +240,41 @@ function collisionBrickFunc(inputs: Observable < any > []): Observable < any > {
 }
 
 function collisionWallFunc(inputs: Observable < any > []): Observable < any > {
+    var r1 = getField(inputs[0], 'x'); // ball$.x
+    var r2 = getField(inputs[0], 'y'); // ball$.y
+    var r3 = constant(BALL_RADIUS);
+    var r4 = constant(canvas.width);
+    var r5 = sub(r4, r3);
+    var r6 = lessThan(r1, r3);
+    var r7 = lessThan(r5, r1);
+    var r8 = or(r6, r7);
+    return r8;
+    /*
     var r1 = inputs[0]; // ball$
     var r2 = r1.pipe(
         map(ball => isCollidedWall(ball))
     );
     return r2;
+    */
 }
 
 function collisionGroundFunc(inputs: Observable < any > []): Observable < any > {
+    var r1 = inputs[0]; // paddlePos$
+    var r2 = getField(inputs[1], "x"); // ball$.x
+    var r3 = getField(inputs[1], "y"); // ball$.y
+    var r4 = constant(PADDLE_WIDTH / 2);
+    var r5 = constant(canvas.height - PADDLE_HEIGHT);
+    var r6 = constant(BALL_RADIUS / 2);
+    var r7 = sub(r1, r4);
+    var r8 = lessThanOrEqualTo(r2, r7);
+    var r9 = add(r1, r4);
+    var r10 = lessThanOrEqualTo(r9, r2);
+    var r11 = sub(r5, r6);
+    var r12 = lessThan(r11, r3);
+    var r13 = or(r8, r10);
+    var r14 = and(r12, r13);
+    return r14;
+    /*
     var r1 = inputs[0]; // paddlePos$ 
     var r2 = inputs[1]; // ball$
     var r3 = zip(r1, r2);
@@ -233,11 +282,12 @@ function collisionGroundFunc(inputs: Observable < any > []): Observable < any > 
         map(([paddle, ball]) => isCollidedGround( < number > paddle, < Ball > (ball)))
     );
     return r4;
+    */
 }
 
 function collisionCeilingFunc(inputs: Observable < any > []): Observable < any > {
-    var r1 = inputs[0]; // ball$
-    var r2 = getField(r1, "y");
+    var r1 = getField(inputs[0], "x"); // ball$.x
+    var r2 = getField(inputs[0], "y"); // ball$.y
     var r3 = constant(BALL_RADIUS);
     var r4 = lessThan(r2, r3);
     return r4;
@@ -366,15 +416,33 @@ function paddleDirFunc(inputs: Observable < any > []): Observable < any > {
 
 function paddlePosFunc(inputs: Observable < any > []): Observable < any > {
     var r1 = inputs[0]; // paddleDir$
+    var r2 = inputs[1]; // paddlePos$ 
+    var r3 = constant(2);
+    var r4 = mul(r1, r3);
+    var r5 = add(r2, r4);
+    return r5;
+    /*
+    var r1 = inputs[0]; // paddleDir$
     var r2 = inputs[1]; // paddlePos$
     var r3 = zip(r1, r2);
     var r4 = r3.pipe(
         map(([paddleDir, paddlePos]) => calculateNewPaddlePos( < number > paddleDir, < number > paddlePos))
     );
     return r4;
+    */
 }
 
 function collisionYFunc(inputs: Observable < any > []): Observable < any > {
+    var r1 = inputs[0]; // collisionBrick$
+    var r2 = inputs[1]; // collisionCeiling$
+    var r3 = inputs[2]; // collisionPaddle$
+    var r4 = constant(-1);
+    var r5 = equalTo(r1, r4);
+    var r6 = not(r5);
+    var r7 = or(r2, r3);
+    var r8 = or(r6, r7);
+    return r8;
+    /*
     var r1 = inputs[0]; // collisionBrick$
     var r2 = inputs[1]; // collisionCeiling$
     var r3 = inputs[2]; // collisionPaddle$
@@ -384,9 +452,27 @@ function collisionYFunc(inputs: Observable < any > []): Observable < any > {
         map(([cB, cC, cP]) => cB || cC || cP)
     );
     return r6;
+    */
 }
 
 function ballDirFunc(inputs: Observable < any > []): Observable < any > {
+    var r1 = inputs[0]; // collisionWall$
+    var r2 = inputs[1]; // collisionY$
+    var r3 = getField(inputs[2], "x"); // ballDir$.x
+    var r4 = getField(inputs[2], "y"); // ballDir$.y
+    var r5 = constant(-1);
+    var r6 = mul(r3, r5);
+    var r7 = mul(r4, r5);
+    var r8 = ifOp(r1, r6, r3);
+    var r9 = ifOp(r2, r7, r4);
+    var r10 = map2(r8, r9, (_x, _y) => {
+        return {
+            x: _x,
+            y: _y
+        };
+    });
+    return r10;
+    /*
     var r1 = inputs[0]; // collisionWall$
     var r2 = inputs[1]; // collisionY$
     var r3 = inputs[2]; // ballDir$
@@ -395,6 +481,7 @@ function ballDirFunc(inputs: Observable < any > []): Observable < any > {
         map(([cX, cY, d]) => calculateNewDir( < boolean > cX, < boolean > cY, < BallDir > d))
     );
     return r5;
+    */
 }
 
 function shouldShutdownFunc(inputs: Observable < any > []): Observable < any > {

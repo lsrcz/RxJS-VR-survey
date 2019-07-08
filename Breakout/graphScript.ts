@@ -20,7 +20,8 @@ import {
     share,
     switchMap,
     take,
-    skip
+    skip,
+    pluck
 } from "rxjs/operators";
 
 // CONTANTS
@@ -32,7 +33,7 @@ const PADDLE_KEYS = {
 
 const TICKER_INTERVAL = 17;
 
-const BRICK_ROWS = 5;
+const BRICK_ROWS = 1;
 const BRICK_COLUMNS = 7;
 const BRICK_HEIGHT = 20;
 const BRICK_GAP = 3;
@@ -156,6 +157,103 @@ function link(f: (inputs: Observable < any > []) => Observable < any > ,
         syncedStreams(...args)
     ).pipe(
         tap(e => outSubject.next(e))
+    );
+}
+
+// OPERATORS
+function constant < T > (x: T): Observable < T > {
+    return tick$.pipe(
+        map(e => x)
+    );
+}
+
+function lessThan(lhs: Observable < number > , rhs: Observable < number > ): Observable < boolean > {
+    return zip(lhs, rhs).pipe(
+        map(([l, r]) => l < r)
+    );
+}
+
+function equalTo(lhs: Observable < number > , rhs: Observable < number > ): Observable < boolean > {
+    return zip(lhs, rhs).pipe(
+        map(([l, r]) => l == r)
+    );
+}
+
+function and(lhs: Observable < boolean > , rhs: Observable < boolean > ): Observable < boolean > {
+    return zip(lhs, rhs).pipe(
+        map(([l, r]) => l && r)
+    );
+}
+
+function or(lhs: Observable < boolean > , rhs: Observable < boolean > ): Observable < boolean > {
+    return zip(lhs, rhs).pipe(
+        map(([l, r]) => l || r)
+    );
+}
+
+function not(input: Observable < boolean > ): Observable < boolean > {
+    return input.pipe(map(e => !e));
+}
+
+function ifOp<T1, T2>(pred: Observable < boolean >, thenv: Observable < T1 >, elsev: Observable < T2 >): Observable<T1|T2> {
+    return zip(pred, thenv, elsev).pipe(
+        map(([p, t, e]) => {
+            if (p) {
+                return t;
+            } else {
+                return e;
+            }
+        })
+    )
+}
+
+function add(lhs: Observable < number > , rhs: Observable < number > ): Observable < number > {
+    return zip(lhs, rhs).pipe(
+        map(([l, r]) => l + r)
+    );
+}
+
+function sub(lhs: Observable < number > , rhs: Observable < number > ): Observable < number > {
+    return zip(lhs, rhs).pipe(
+        map(([l, r]) => l - r)
+    );
+}
+
+function times(lhs: Observable < number > , rhs: Observable < number > ): Observable < number > {
+    return zip(lhs, rhs).pipe(
+        map(([l, r]) => l * r)
+    );
+}
+
+function map1 < T, R > (s: Observable < T > , f: (x: T) => R): Observable < R > {
+    return s.pipe(
+        map(f)
+    );
+}
+
+function map2 < T1, T2, R > (s1: Observable < T1 > , s2: Observable < T2 > , f: (x: T1, y: T2) => R): Observable < R > {
+    return zip(s1, s2).pipe(
+        map(([x, y]) => f(x, y)),
+    );
+}
+
+function map3 < T1, T2, T3, R > (s1: Observable < T1 > , s2: Observable < T2 > , s3: Observable < T3 > ,
+    f: (x: T1, y: T2, z: T3) => R): Observable < R > {
+    return zip(s1, s2, s3).pipe(
+        map(([x, y, z]) => f(x, y, z))
+    );
+}
+
+function map4 < T1, T2, T3, T4, R > (s1: Observable < T1 > , s2: Observable < T2 > , s3: Observable < T3 > , s4: Observable < T4 > ,
+    f: (x: T1, y: T2, z: T3, a: T4) => R): Observable < R > {
+    return zip(s1, s2, s3, s4).pipe(
+        map(([x, y, z, a]) => f(x, y, z, a))
+    );
+}
+
+function getField < T, K1 extends keyof T > (s: Observable < T > , k1: K1): Observable < T[K1] > {
+    return s.pipe(
+        pluck(k1)
     );
 }
 
@@ -384,13 +482,67 @@ function collisionGroundFunc(inputs: Observable < any > []): Observable < any > 
 
 function collisionCeilingFunc(inputs: Observable < any > []): Observable < any > {
     var r1 = inputs[0]; // ball$
+    var r2 = getField(r1, "y");
+    var r3 = constant(BALL_RADIUS);
+    var r4 = lessThan(r2, r3);
+    return r4;
+    /*
+    var r1 = inputs[0]; // ball$
     var r2 = r1.pipe(
         map(ball => isCollidedCeiling(ball)),
     );
     return r2;
+    */
 }
 
 function ballFunc(inputs: Observable < any > []): Observable < any > {
+    // The function may be shown in linear form as:
+    // 4 inputs, 5 instructions, 2 return values
+    // field access can be handled by the synthesizer
+    var r1 = getField(inputs[0], "x"); // nextBallDir.x
+    var r2 = getField(inputs[0], "y"); // nextBallDir.y
+    var r3 = getField(inputs[1], "x"); // ball.x
+    var r4 = getField(inputs[1], "y"); // ball.y
+
+    var r5 = constant(0.2);
+    var r6 = times(r1, r5);
+    var r7 = times(r2, r5);
+    var r8 = add(r3, r6);
+    var r9 = add(r4, r7);
+
+    var r10 = map2(r8, r9, (_x, _y) => {
+        return {
+            x: _x,
+            y: _y
+        }
+    });
+    return r10;
+    /*
+    var r1 = inputs[0]; // nextBallDir$
+    var r2 = inputs[1]; // ball$ 
+    var r3 = getField(r1, "x");
+    var r4 = getField(r1, "y");
+    var r5 = map1(r3, e => e * 0.2);
+    var r6 = map1(r4, e => e * 0.2);
+    var r7 = getField(r2, "x");
+    var r8 = getField(r2, "y");
+    var r9 = add(r5, r7);
+    var r10 = add(r6, r8);
+    var r11 = map2(r9, r10, (_x, _y) => {
+        return {
+            x: _x,
+            y: _y
+        }
+    });
+    return r11;
+    */
+    /*
+    var r1 = inputs[0]; // nextBallDir$
+    var r2 = inputs[1]; // ball$
+    var r3 = map2(r1, r2, calculateBallPosNext);
+    return r3;
+    */
+    /*
     var r1 = inputs[0]; // nextBallDir$
     var r2 = inputs[1]; // ball$
     var r3 = zip(r1, r2);
@@ -398,16 +550,25 @@ function ballFunc(inputs: Observable < any > []): Observable < any > {
         map(([nextDir, ball]) => calculateBallPosNext(nextDir, ball))
     );
     return r4;
+    */
 }
 
 function scoreFunc(inputs: Observable < any > []): Observable < any > {
-    var r1 = inputs[0]; // bricks$
+    var r1 = inputs[0]; // collisionBrick$
+    var r2 = inputs[1]; // score$
+    var r3 = map1(r1, e => e == -1);
+    var r4 = constant(10);
+    var r5 = add(r2, r4);
+    var r6 = ifOp(r3, r2, r5);
+    return r6;
+    /*
+    var r1 = inputs[0]; // collisionBrick$
     var r2 = inputs[1]; // score$
     var r3 = zip(r1, r2);
     var r4 = r3.pipe(
         map(([brick, score]) => calculateNewScore( < number > brick, < number > score))
     );
-    return r4;
+    return r4;*/
 }
 
 function bricksFunc(inputs: Observable < any > []): Observable < any > {

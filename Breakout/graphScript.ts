@@ -28,7 +28,8 @@ import {
     add,
     map2,
     map1,
-    ifOp
+    ifOp,
+    equalTo
 } from "./operators";
 import {
     BRICK_GAP,
@@ -337,6 +338,18 @@ function bricksFunc(inputs: Observable < any > []): Observable < any > {
 
 function paddleDirFunc(inputs: Observable < any > []): Observable < any > {
     var r1 = inputs[0]; // keyCodeRelay$
+    var r2 = constant(0);
+    var r3 = constant(1);
+    var r4 = constant(-1);
+    var r5 = constant(PADDLE_KEYS.left);
+    var r6 = constant(PADDLE_KEYS.right); // constant pool?
+    var r7 = equalTo(r1, r5);
+    var r8 = equalTo(r1, r6);
+    var r9 = ifOp(r7, r4, r2);
+    var r10 = ifOp(r8, r3, r9);
+    return r10;
+    /*
+    var r1 = inputs[0];
     var r2 = r1.pipe(
         map(keyCode => {
             if (keyCode == PADDLE_KEYS.left) {
@@ -348,6 +361,7 @@ function paddleDirFunc(inputs: Observable < any > []): Observable < any > {
         })
     );
     return r2;
+    */
 }
 
 function paddlePosFunc(inputs: Observable < any > []): Observable < any > {

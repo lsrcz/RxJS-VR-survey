@@ -2,68 +2,56 @@ import {
     fromEvent,
     Observable,
     merge,
-    animationFrameScheduler,
-    interval,
     zip,
     BehaviorSubject,
     Subject,
-    NEVER
 } from "rxjs";
 import {
     map,
-    filter,
     distinctUntilChanged,
-    withLatestFrom,
-    startWith,
-    scan,
     tap,
     share,
-    switchMap,
     take,
     skip,
-    pluck
 } from "rxjs/operators";
-
-// CONTANTS
-
-const PADDLE_KEYS = {
-    left: 37,
-    right: 39
-};
-
-const TICKER_INTERVAL = 17;
-
-const BRICK_ROWS = 1;
-const BRICK_COLUMNS = 7;
-const BRICK_HEIGHT = 20;
-const BRICK_GAP = 3;
-
-const PADDLE_WIDTH = 100;
-const PADDLE_HEIGHT = 20;
-
-const BALL_RADIUS = 10;
-
-
-const canvas = < HTMLCanvasElement > document.getElementById('stage');
-const context = canvas.getContext('2d');
-context.fillStyle = 'pink';
-
-class Ball {
-    x: number;
-    y: number;
-};
-
-class BallDir {
-    x: number;
-    y: number;
-}
-
-class Brick {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-}
+import {
+    startTick,
+    syncWithTick,
+    link,
+    observeWithFrame
+} from "./tick";
+import {
+    getField,
+    constant,
+    lessThan,
+    times,
+    add,
+    map2,
+    map1,
+    ifOp
+} from "./operators";
+import {
+    BRICK_GAP,
+    BRICK_COLUMNS,
+    BRICK_ROWS,
+    BRICK_HEIGHT,
+    PADDLE_WIDTH,
+    PADDLE_HEIGHT,
+    BALL_RADIUS,
+    PADDLE_KEYS
+} from "./constants";
+import {
+    BallDir,
+    Brick,
+    Ball
+} from "./model";
+import {
+    drawAll,
+    drawTitle,
+    drawAuthor,
+    drawControls,
+    canvas
+} from "./ui";
 
 function factory() {
     let width = (canvas.width - BRICK_GAP - BRICK_GAP * BRICK_COLUMNS) / BRICK_COLUMNS;
@@ -97,165 +85,8 @@ const keyCodeAsync$: Observable < number > = merge(
 
 keyCodeAsync$.pipe(
     take(1),
-    tap(_ => control$.next(true))
+    tap(_ => startTick())
 ).subscribe()
-
-const control$: BehaviorSubject < boolean > = new BehaviorSubject(false);
-
-// TICK
-
-const tick$ = control$.asObservable().pipe(
-    distinctUntilChanged(),
-    switchMap(isTicking => {
-        return isTicking ? /*interval(TICKER_INTERVAL, animationFrameScheduler)*/ interval(TICKER_INTERVAL / 5) : NEVER;
-    })
-);
-
-function syncWithTick < T > (v: Observable < T > ): Observable < T > {
-    return tick$.pipe(
-        withLatestFrom(v),
-        map(([_, v]) => v),
-        share()
-    );
-}
-
-function syncedInput(...args: (Observable < any > | Subject < any > )[]): Observable < any[] > {
-    return zip(tick$, ...(args.map(o => {
-        if (o instanceof Subject) {
-            return o.asObservable();
-        }
-        return o;
-    }))).pipe(
-        map(([x, ...args]) => args),
-        share()
-    );
-}
-
-function splitStream(stream: Observable < any[] > , num: number): Observable < any > [] {
-    var ret: Subject < any > [] = [];
-    for (var i = 0; i < num; ++i) {
-        ret.push(new Subject());
-    }
-    stream.pipe(
-        tap(arr => {
-            for (var i = 0; i < num; ++i) {
-                ret[i].next(arr[i]);
-            }
-        })
-    ).subscribe();
-    return ret.map(e => e.asObservable());
-}
-
-function syncedStreams(...args: (Observable < any > | Subject < any > )[]): Observable < any > [] {
-    return splitStream(syncedInput(...args), args.length);
-}
-
-function link(f: (inputs: Observable < any > []) => Observable < any > ,
-    outSubject: Subject < any > ,
-    ...args: (Observable < any > | Subject < any > )[]) {
-    return f(
-        syncedStreams(...args)
-    ).pipe(
-        tap(e => outSubject.next(e))
-    );
-}
-
-// OPERATORS
-function constant < T > (x: T): Observable < T > {
-    return tick$.pipe(
-        map(e => x)
-    );
-}
-
-function lessThan(lhs: Observable < number > , rhs: Observable < number > ): Observable < boolean > {
-    return zip(lhs, rhs).pipe(
-        map(([l, r]) => l < r)
-    );
-}
-
-function equalTo(lhs: Observable < number > , rhs: Observable < number > ): Observable < boolean > {
-    return zip(lhs, rhs).pipe(
-        map(([l, r]) => l == r)
-    );
-}
-
-function and(lhs: Observable < boolean > , rhs: Observable < boolean > ): Observable < boolean > {
-    return zip(lhs, rhs).pipe(
-        map(([l, r]) => l && r)
-    );
-}
-
-function or(lhs: Observable < boolean > , rhs: Observable < boolean > ): Observable < boolean > {
-    return zip(lhs, rhs).pipe(
-        map(([l, r]) => l || r)
-    );
-}
-
-function not(input: Observable < boolean > ): Observable < boolean > {
-    return input.pipe(map(e => !e));
-}
-
-function ifOp<T1, T2>(pred: Observable < boolean >, thenv: Observable < T1 >, elsev: Observable < T2 >): Observable<T1|T2> {
-    return zip(pred, thenv, elsev).pipe(
-        map(([p, t, e]) => {
-            if (p) {
-                return t;
-            } else {
-                return e;
-            }
-        })
-    )
-}
-
-function add(lhs: Observable < number > , rhs: Observable < number > ): Observable < number > {
-    return zip(lhs, rhs).pipe(
-        map(([l, r]) => l + r)
-    );
-}
-
-function sub(lhs: Observable < number > , rhs: Observable < number > ): Observable < number > {
-    return zip(lhs, rhs).pipe(
-        map(([l, r]) => l - r)
-    );
-}
-
-function times(lhs: Observable < number > , rhs: Observable < number > ): Observable < number > {
-    return zip(lhs, rhs).pipe(
-        map(([l, r]) => l * r)
-    );
-}
-
-function map1 < T, R > (s: Observable < T > , f: (x: T) => R): Observable < R > {
-    return s.pipe(
-        map(f)
-    );
-}
-
-function map2 < T1, T2, R > (s1: Observable < T1 > , s2: Observable < T2 > , f: (x: T1, y: T2) => R): Observable < R > {
-    return zip(s1, s2).pipe(
-        map(([x, y]) => f(x, y)),
-    );
-}
-
-function map3 < T1, T2, T3, R > (s1: Observable < T1 > , s2: Observable < T2 > , s3: Observable < T3 > ,
-    f: (x: T1, y: T2, z: T3) => R): Observable < R > {
-    return zip(s1, s2, s3).pipe(
-        map(([x, y, z]) => f(x, y, z))
-    );
-}
-
-function map4 < T1, T2, T3, T4, R > (s1: Observable < T1 > , s2: Observable < T2 > , s3: Observable < T3 > , s4: Observable < T4 > ,
-    f: (x: T1, y: T2, z: T3, a: T4) => R): Observable < R > {
-    return zip(s1, s2, s3, s4).pipe(
-        map(([x, y, z, a]) => f(x, y, z, a))
-    );
-}
-
-function getField < T, K1 extends keyof T > (s: Observable < T > , k1: K1): Observable < T[K1] > {
-    return s.pipe(
-        pluck(k1)
-    );
-}
 
 // RELAY
 const keyCodeRelay$ = syncWithTick(keyCodeAsync$);
@@ -287,7 +118,6 @@ const collisionY$: Subject < boolean > = new Subject < boolean > ();
 const nextBallDir$ = ballDir$.asObservable().pipe(skip(1));
 
 // USER FUNCTIONS
-
 function isCollidedPaddle(paddlePos: number, ball: Ball): boolean {
     return ball.x > paddlePos - PADDLE_WIDTH / 2 &&
         ball.x < paddlePos + PADDLE_WIDTH / 2 &&
@@ -363,82 +193,6 @@ function calculateNewDir(collisionX: boolean, collisionY: boolean, ballDir: Ball
     }
     return ballDir;
 }
-
-// STREAMS -- OLD STYLE
-
-const collisionPaddle$$ = syncedInput(paddlePos$, ball$).pipe(
-    map(([paddle, ball]) => isCollidedPaddle( < number > paddle, < Ball > ball)),
-    tap(e => collisionPaddle$.next(e))
-);
-
-const collisionBrick$$ = syncedInput(bricks$, ball$).pipe(
-    map(([bricks, ball]) => isCollidedBrick( < Brick[] > bricks, < Ball > (ball))),
-    tap(e => collisionBrick$.next(e))
-);
-
-const collisionWall$$ = syncedInput(ball$).pipe(
-    map(([ball]) => isCollidedWall( < Ball > (ball))),
-    tap(e => collisionWall$.next(e))
-);
-
-const collisionGround$$ = syncedInput(paddlePos$, ball$).pipe(
-    map(([paddle, ball]) => isCollidedGround( < number > paddle, < Ball > (ball))),
-    tap(e => collisionGround$.next(e))
-);
-
-const collisionCeiling$$ = syncedInput(ball$).pipe(
-    map(([ball]) => isCollidedCeiling( < Ball > (ball))),
-    tap(e => collisionCeiling$.next(e))
-);
-
-const ball$$ = syncedInput(nextBallDir$, ball$).pipe(
-    map(([nextDir, ball]) => calculateBallPosNext(nextDir, ball)),
-    tap(e => ball$.next(e))
-);
-
-const score$$ = syncedInput(collisionBrick$, score$).pipe(
-    map(([brick, score]) => calculateNewScore( < number > brick, < number > score)),
-    tap(e => score$.next(e))
-);
-
-const brick$$ = syncedInput(bricks$, collisionBrick$).pipe(
-    map(([bricks, collision]) => calculateNewBrickSet( < Brick[] > (bricks), < number > (collision))),
-    tap(e => bricks$.next(e))
-);
-
-const paddleDir$$ = syncedInput(keyCodeRelay$).pipe(
-    map(([keyCode]) => {
-        if (keyCode == PADDLE_KEYS.left) {
-            return -1;
-        } else if (keyCode == PADDLE_KEYS.right) {
-            return 1;
-        }
-        return 0;
-    }),
-    tap(e => paddleDir$.next(e))
-)
-
-const paddlePos$$ = syncedInput(paddleDir$, paddlePos$).pipe(
-    map(([paddleDir, paddlePos]) => calculateNewPaddlePos( < number > paddleDir, < number > paddlePos)),
-    tap(e => paddlePos$.next(e))
-);
-
-const collisionY$$ = syncedInput(collisionBrick$, collisionCeiling$, collisionPaddle$).pipe(
-    map(([cB, cC, cP]) => [cB != -1, cC, cP]),
-    map(([cB, cC, cP]) => cB || cC || cP),
-    tap((e: boolean) => collisionY$.next(e))
-);
-
-const ballDir$$ = syncedInput(collisionWall$, collisionY$, ballDir$).pipe(
-    map(([cX, cY, d]) => calculateNewDir( < boolean > cX, < boolean > cY, < BallDir > d)),
-    tap(e => ballDir$.next(e))
-);
-
-const shouldShutdown$$ = syncedInput(bricks$, collisionGround$).pipe(
-    map(([b, cg]) => ( < Brick[] > b).length == 0 || < boolean > cg),
-    tap(e => shouldShutdown$.next(e))
-);
-
 
 // FUNCTIONS TO SYNTHESIZE
 
@@ -656,109 +410,10 @@ merge(
     link(shouldShutdownFunc, shouldShutdown$, bricks$, collisionGround$)
 ).subscribe()
 
-
 // UI
-function drawTitle() {
-    context.textAlign = 'center';
-    context.font = '24px Courier New';
-    context.fillText('rxjs breakout', canvas.width / 2, canvas.height / 2 - 24);
-}
-
-function drawControls() {
-    context.textAlign = 'center';
-    context.font = '16px Courier New';
-    context.fillText('press [<] and [>] to play', canvas.width / 2, canvas.height / 2);
-}
-
-function drawGameOver(text) {
-    context.clearRect(canvas.width / 4, canvas.height / 3, canvas.width / 2, canvas.height / 3);
-    context.textAlign = 'center';
-    context.font = '24px Courier New';
-    context.fillText(text, canvas.width / 2, canvas.height / 2);
-}
-
-function drawAuthor() {
-    context.textAlign = 'center';
-    context.font = '16px Courier New';
-    context.fillText('by Manuel Wieser', canvas.width / 2, canvas.height / 2 + 24);
-}
-
-function drawScore(score) {
-    context.textAlign = 'left';
-    context.font = '16px Courier New';
-    context.fillText(score, BRICK_GAP, 16);
-}
-
-function drawPaddle(position: number) {
-    context.beginPath();
-    context.rect(
-        position - PADDLE_WIDTH / 2,
-        context.canvas.height - PADDLE_HEIGHT,
-        PADDLE_WIDTH,
-        PADDLE_HEIGHT);
-
-    context.fill();
-    context.closePath();
-}
-
-function drawBall(ball: Ball) {
-    context.beginPath();
-    context.arc(ball.x, ball.y, BALL_RADIUS, 0, Math.PI * 2);
-    context.fill();
-    context.closePath();
-}
-
-function drawBrick(brick: Brick) {
-    context.beginPath();
-    context.rect(
-        brick.x - brick.width / 2,
-        brick.y - brick.height / 2,
-        brick.width,
-        brick.height);
-
-    context.fill();
-    context.closePath();
-}
-
-function drawBricks(bricks: Brick[]) {
-    bricks.forEach(brick => drawBrick(brick));
-}
-
-function drawAll(paddlePos: number, bricks: Brick[], ball: Ball, score: number, shut: boolean, cg: boolean) {
-    context.clearRect(0, 0, canvas.width, canvas.height);
-
-    drawPaddle(paddlePos);
-    drawBall(ball);
-    drawBricks(bricks);
-    drawScore(score);
-
-    if (cg) {
-        drawGameOver("Game over");
-    }
-    if (bricks.length == 0) {
-        drawGameOver("Win");
-    }
-
-    if (shut) {
-        control$.next(false);
-    }
-}
-
-// DRAW
-
-const screenTick$ = control$.asObservable().pipe(
-    distinctUntilChanged(),
-    switchMap(isTicking => {
-        return isTicking ? interval(TICKER_INTERVAL, animationFrameScheduler) : NEVER;
-    })
-);
-
-screenTick$.pipe(
-    withLatestFrom(syncedInput(paddlePos$, bricks$, ball$, score$, shouldShutdown$, collisionGround$)),
-    map(([_, t]) => t),
-    tap(([paddlePos, bricks, ball, score, shut, cg]) => drawAll( < number > paddlePos, < Brick[] > bricks, < Ball > ball, < number > score, < boolean > shut, < boolean > cg))
-).subscribe();
-
 drawTitle();
 drawAuthor();
 drawControls();
+observeWithFrame(paddlePos$, bricks$, ball$, score$, shouldShutdown$, collisionGround$).subscribe(
+    ([paddlePos, bricks, ball, score, shut, cg]) => drawAll( < number > paddlePos, < Brick[] > bricks, < Ball > ball, < number > score, < boolean > shut, < boolean > cg)
+);

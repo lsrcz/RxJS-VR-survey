@@ -253,14 +253,16 @@ drawTitle();
 drawAuthor();
 drawControls();
 
-cGround$.subscribe(_ => {
+const fail = cGround$.subscribe(_ => {
+    fail.unsubscribe();
     game.unsubscribe();
     drawGameOver("Game over");
 });
 
-bricks$.pipe(
+const win = bricks$.pipe(
     filter(b => b.length == 0)
 ).subscribe(_ => {
+    fail.unsubscribe();
     game.unsubscribe();
     drawGameOver("Win");
 });

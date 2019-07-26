@@ -79,6 +79,18 @@ function main(sources) {
     const paddle$: Observable < number > = sources['paddle'];
     const bricks$: Observable < Brick[] > = sources['bricks'];
     const ball$: Observable < Ball > = sources['ball'];
+    const stop$: Observable < boolean > = sources['stop'];
+
+    const stopableTick$ = stop$.pipe(
+        switchMap(e => {
+            if (e) {
+                return NEVER;
+            } else {
+                return tick$;
+            }
+        }),
+        share(),
+    );
 
     const cPaddle$ = ball$.pipe(
         filter(({
@@ -192,7 +204,7 @@ function main(sources) {
         switchMap(e => {
             switch (e) {
                 case 'gaming':
-                    return tick$.pipe(
+                    return stopableTick$.pipe(
                         withLatestFrom(ballDir$),
                         startWith({
                             x: canvas.width / 2,
@@ -234,6 +246,22 @@ function main(sources) {
         share()
     );
 
+    const stopSink$ = gamestate$.pipe(
+        switchMap(e => {
+            switch (e) {
+                case 'gaming':
+                    return click$.pipe(
+                        startWith(false),
+                        scan((acc, _) => !acc)
+                    );
+                default:
+                    return of(false);
+            }
+        }),
+        distinctUntilChanged(),
+        share(),
+    )
+
     const paddleDir$: Observable < number > = merge(
         keydown$.pipe(
             map((e: KeyboardEvent) => {
@@ -258,7 +286,7 @@ function main(sources) {
         switchMap((e: string) => {
             switch (e) {
                 case 'gaming':
-                    return tick$.pipe(
+                    return stopableTick$.pipe(
                         withLatestFrom(paddleDir$),
                         map(([_, dir]) => dir),
                         startWith(canvas.width / 2),
@@ -319,6 +347,7 @@ function main(sources) {
         ball: ballSink$,
         bricks: bricksSink$,
         score: scoreSink$,
+        stop: stopSink$,
     }
 }
 
@@ -333,6 +362,7 @@ function run(main) {
     const fakeBall$ = new ReplaySubject(1);
     const fakeBricks$ = new ReplaySubject(1);
     const fakeScore$ = new ReplaySubject(1);
+    const fakeStop$ = new ReplaySubject(1);
 
 
     const ret = main({
@@ -344,6 +374,7 @@ function run(main) {
         paddle: fakePaddle$.asObservable(),
         ball: fakeBall$.asObservable(),
         bricks: fakeBricks$.asObservable(),
+        stop: fakeStop$.asObservable(),
     });
 
     return merge(
@@ -352,6 +383,7 @@ function run(main) {
         ret['ball'].pipe(tap(e => fakeBall$.next(e))),
         ret['bricks'].pipe(tap(e => fakeBricks$.next(e))),
         ret['score'].pipe(tap(e => fakeScore$.next(e))),
+        ret['stop'].pipe(tap(e => fakeStop$.next(e))),
 
         tick$.pipe(
             withLatestFrom(combineLatest(

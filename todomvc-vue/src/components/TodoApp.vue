@@ -93,7 +93,7 @@ function isNotCompleted(todo: Todo) {
       }),
       share(),
     );
-    merge(newTodo$, addTodoItem$.pipe(mapTo(''))).subscribe(newTodoVal$);
+    this.$subscribeTo(merge(newTodo$, addTodoItem$.pipe(mapTo(''))), (e) => newTodoVal$.next(e));
     const todoAction$ = merge(
       addTodoItem$.pipe(
         map((todo: Todo) => new InsertAction(todo)),
@@ -179,7 +179,6 @@ export default class TodoApp extends Vue {
     );
   }
 }
-
 </script>
 
 <style>

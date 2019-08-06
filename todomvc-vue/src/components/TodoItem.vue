@@ -62,8 +62,6 @@ import { mapTo, filter, startWith, withLatestFrom, map, pluck, tap, distinctUnti
       this.todo$.pipe(
         map((todo: Todo) => todo.title),
       ),
-    ).pipe(
-      startWith(this.todo.title),
     );
     const newVal$ = doneEdit$.pipe(
       withLatestFrom(inputVal$),
